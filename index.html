@@ -151,6 +151,11 @@
             border-top: 1px solid #ccc;
             padding-top: 20px;
         }
+        
+        @media (max-width: 480px) {
+            .container { padding: 20px; margin: 10px; }
+            h1 { font-size: 1.8rem; }
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -173,7 +178,7 @@
         <div id="loader" class="loading">Открываю долговую книгу...</div>
         <ul class="list" id="debt-list"></ul>
 
-        <button onclick="loadData()" class="refresh-btn">Обновить данные</button>
+        <button onclick="loadData()" class="refresh-btn">Обновить реестр</button>
 
         <footer>
             © Ф.М. Достоевский <br>
@@ -182,11 +187,8 @@
     </div>
 
     <script>
-        // ==========================================
-        // ВСТАВЬ СЮДА СВОЮ ССЫЛКУ ИЗ GOOGLE SHEETS
-        // Она должна заканчиваться на ...output=csv
-        // ==========================================
-        const SHEET_URL = 'СЮДА_ВСТАВЬ_ССЫЛКУ_НА_CSV'; 
+        // Твоя ссылка уже вставлена сюда:
+        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-QQYIFvB07tM3x00tpl-i55EiO18YVzGXgXuPIsHVvxQ3aidogQ7xX_9PVm7K3-UQz-ZeXqCo90B_/pub?output=csv'; 
         
         const PRICE_PER_PERSON = 5000;
 
@@ -198,19 +200,24 @@
             loader.style.display = 'block';
 
             try {
-                const response = await fetch(SHEET_URL);
+                // Добавляем случайное число в конец ссылки, чтобы браузер не кэшировал старые данные
+                const response = await fetch(SHEET_URL + '&cache_buster=' + Math.random());
                 const data = await response.text();
                 
-                // Парсим CSV (простой метод)
-                const rows = data.split('\n').map(row => row.trim()).filter(row => row.length > 0);
-                // Убираем заголовок (первую строку)
+                // Разбиваем CSV на строки
+                const rows = data.split(/\r?\n/).map(row => row.trim()).filter(row => row.length > 0);
+                
+                // Пропускаем первую строку (заголовок) и обрабатываем остальные
                 const people = rows.slice(1).map(row => {
-                    // Разделяем по запятой. Учитываем, что в именах запятых быть не должно!
                     const cols = row.split(',');
-                    // Берем имя и статус (0 или 1)
+                    // Берем Имя (колонку 0) и Статус (колонку 1)
+                    // Удаляем лишние кавычки, если они вдруг появятся
+                    let name = cols[0] ? cols[0].replace(/^"|"$/g, '') : "Без имени";
+                    let statusRaw = cols[1] ? cols[1].trim() : "0";
+                    
                     return {
-                        name: cols[0],
-                        paid: cols[1] && (cols[1].trim() === '1' || cols[1].toLowerCase().trim() === 'true')
+                        name: name,
+                        paid: (statusRaw === '1' || statusRaw.toLowerCase() === 'true')
                     };
                 });
 
@@ -218,7 +225,7 @@
                 loader.style.display = 'none';
 
             } catch (error) {
-                loader.innerText = 'Ошибка загрузки реестра. Проверь ссылку.';
+                loader.innerHTML = 'Ошибка: Не удалось прочитать долговую книгу.<br>Проверьте Google Таблицу.';
                 console.error(error);
             }
         }
@@ -227,6 +234,11 @@
             const listElement = document.getElementById('debt-list');
             let paidCount = 0;
             let totalPeople = participants.length;
+
+            if (totalPeople === 0) {
+                 listElement.innerHTML = '<div style="text-align:center; padding:20px;">Список пуст или ошибка чтения таблицы</div>';
+                 return;
+            }
 
             participants.forEach((person, index) => {
                 const li = document.createElement('li');
@@ -259,15 +271,13 @@
             
             if (percentage === 100) {
                 document.getElementById('progress').style.backgroundColor = '#2e7d32';
+            } else {
+                document.getElementById('progress').style.backgroundColor = '#8b0000';
             }
         }
 
-        // Загрузка при старте
-        if (SHEET_URL.includes('google')) {
-            loadData();
-        } else {
-            document.getElementById('loader').innerText = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-QQYIFvB07tM3x00tpl-i55EiO18YVzGXgXuPIsHVvxQ3aidogQ7xX_9PVm7K3-UQz-ZeXqCo90B_/pub?output=csv';
-        }
+        // Загружаем данные сразу при открытии страницы
+        loadData();
     </script>
 </body>
 </html>
