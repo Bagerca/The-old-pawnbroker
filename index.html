@@ -4,14 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Old Pawnbroker | Долговая книга</title>
+    <!-- Подключаем библиотеку для создания скриншотов -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
             --bg-color: #1a1818;
             --paper-color: #fdfbf7;
             --text-color: #2c2a2a;
-            --accent-color: #8b0000; /* Кровь (Долг) */
-            --gold-color: #b8860b;   /* Золото (Частично) */
-            --green-color: #2e7d32;  /* Зеленый (Сдано) */
+            --accent-color: #8b0000;
+            --gold-color: #b8860b;
+            --green-color: #2e7d32;
         }
 
         body {
@@ -23,6 +25,8 @@
             display: flex;
             justify-content: center;
             min-height: 100vh;
+            /* Добавляем отступ снизу, чтобы кнопки не прилипали к краю экрана */
+            padding-bottom: 50px; 
         }
 
         .container {
@@ -34,6 +38,7 @@
             box-shadow: 0 0 20px rgba(0,0,0,0.7);
             border-radius: 2px;
             position: relative;
+            /* Текстура бумаги */
             background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d6d3cd' fill-opacity='0.1'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7z' /%3E%3C/g%3E%3C/svg%3E");
         }
 
@@ -43,6 +48,7 @@
             top: 0; left: 0; right: 0; bottom: 0;
             box-shadow: inset 0 0 60px rgba(0,0,0,0.15);
             pointer-events: none;
+            z-index: 1;
         }
 
         h1 {
@@ -69,6 +75,8 @@
             border: 1px solid #ccc;
             margin-bottom: 30px;
             text-align: center;
+            position: relative;
+            z-index: 2;
         }
 
         .money-display {
@@ -99,6 +107,8 @@
             list-style: none;
             padding: 0;
             margin: 0;
+            position: relative;
+            z-index: 2;
         }
 
         .list-item {
@@ -119,8 +129,6 @@
             font-family: 'Courier New', monospace;
             font-weight: bold;
         }
-        
-        /* Статусы */
         .status.paid { color: var(--green-color); }
         .status.partial { color: var(--gold-color); }
         .status.pending { color: var(--accent-color); }
@@ -132,19 +140,35 @@
             color: #777;
         }
 
-        .refresh-btn {
-            display: block;
-            margin: 20px auto 0;
+        /* Блок кнопок */
+        .buttons-area {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+            position: relative;
+            z-index: 10; /* Кнопки поверх всего */
+        }
+
+        .btn {
             background: none;
             border: 1px solid #555;
-            padding: 5px 15px;
+            padding: 8px 20px;
             cursor: pointer;
             font-family: 'Georgia', serif;
             text-transform: uppercase;
             font-size: 0.8rem;
-            opacity: 0.6;
+            opacity: 0.7;
+            transition: all 0.3s;
+            background-color: rgba(255,255,255,0.5);
         }
-        .refresh-btn:hover { opacity: 1; background: rgba(0,0,0,0.05); }
+        .btn:hover { opacity: 1; background-color: #fff; border-color: #000; }
+        
+        .btn-download {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            font-weight: bold;
+        }
 
         footer {
             margin-top: 40px;
@@ -158,13 +182,14 @@
         @media (max-width: 480px) {
             .container { padding: 20px; margin: 10px; }
             h1 { font-size: 1.8rem; }
+            .buttons-area { flex-direction: column; }
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-    <div class="container">
+    <div class="container" id="capture-area">
         <h1>The Old Pawnbroker</h1>
         <div class="subtitle">«Арифметика» сбора</div>
 
@@ -181,7 +206,11 @@
         <div id="loader" class="loading">Подсчитываю выручку...</div>
         <ul class="list" id="debt-list"></ul>
 
-        <button onclick="loadData()" class="refresh-btn">Обновить реестр</button>
+        <!-- Кнопки управления -->
+        <div class="buttons-area" data-html2canvas-ignore="true">
+            <button onclick="loadData()" class="btn">Обновить реестр</button>
+            <button onclick="downloadImage()" class="btn btn-download">Скачать выписку</button>
+        </div>
 
         <footer>
             © Ф.М. Достоевский <br>
@@ -190,9 +219,7 @@
     </div>
 
     <script>
-        // Твоя ссылка
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-QQYIFvB07tM3x00tpl-i55EiO18YVzGXgXuPIsHVvxQ3aidogQ7xX_9PVm7K3-UQz-ZeXqCo90B_/pub?output=csv'; 
-        
         const PRICE_PER_PERSON = 5000;
 
         async function loadData() {
@@ -208,12 +235,9 @@
                 
                 const rows = data.split(/\r?\n/).map(row => row.trim()).filter(row => row.length > 0);
                 
-                // Пропускаем заголовок
                 const people = rows.slice(1).map(row => {
                     const cols = row.split(',');
                     let name = cols[0] ? cols[0].replace(/^"|"$/g, '') : "Без имени";
-                    
-                    // Очищаем сумму от пробелов и кавычек, превращаем в число
                     let amountRaw = cols[1] ? cols[1].replace(/[^0-9]/g, '') : "0";
                     let amount = parseInt(amountRaw);
                     if (isNaN(amount)) amount = 0;
@@ -225,18 +249,15 @@
                 loader.style.display = 'none';
 
             } catch (error) {
-                loader.innerHTML = 'Ошибка: Не удалось прочитать долговую книгу.<br>Проверьте таблицу.';
+                loader.innerHTML = 'Ошибка соединения с книгой.';
                 console.error(error);
             }
         }
 
         function renderList(participants) {
             const listElement = document.getElementById('debt-list');
-            
             let totalCollected = 0;
             let fullPaidCount = 0;
-            // Если в таблице меньше 24 человек, считаем по факту, или фиксируем 24? 
-            // Сейчас код адаптируется под количество строк в таблице.
             let totalPeople = participants.length; 
 
             if (totalPeople === 0) {
@@ -276,10 +297,6 @@
         }
 
         function updateStats(currentSum, paidCount, totalPeople) {
-            // Если хочешь жестко закрепить цель на 24 человека, 
-            // даже если в таблице их пока меньше, раскомментируй строку ниже:
-            // totalPeople = 24; 
-
             const totalGoal = totalPeople * PRICE_PER_PERSON;
             const percentage = totalGoal > 0 ? (currentSum / totalGoal) * 100 : 0;
 
@@ -291,10 +308,44 @@
             document.getElementById('progress').style.width = percentage + '%';
             
             if (percentage >= 100) {
-                document.getElementById('progress').style.backgroundColor = '#2e7d32'; // Зеленый
+                document.getElementById('progress').style.backgroundColor = '#2e7d32';
             } else {
-                document.getElementById('progress').style.backgroundColor = '#8b0000'; // Красный
+                document.getElementById('progress').style.backgroundColor = '#8b0000';
             }
+        }
+
+        // Функция для скачивания картинки
+        function downloadImage() {
+            const element = document.getElementById('capture-area');
+            const btnArea = document.querySelector('.buttons-area');
+            
+            // Временно меняем текст кнопки, чтобы пользователь видел реакцию
+            const btn = document.querySelector('.btn-download');
+            const originalText = btn.innerText;
+            btn.innerText = "Печать...";
+
+            html2canvas(element, {
+                scale: 2, // Высокое качество
+                ignoreElements: (el) => el.classList.contains('buttons-area'), // Игнорируем кнопки на фото
+                backgroundColor: null // Прозрачный фон (чтобы бумага была видна)
+            }).then(canvas => {
+                // Создаем ссылку для скачивания
+                const link = document.createElement('a');
+                // Генерируем имя файла с текущей датой
+                const date = new Date();
+                const dateStr = date.toLocaleDateString('ru-RU').replace(/\./g, '-');
+                
+                link.download = `Debt_Book_${dateStr}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+                // Возвращаем текст кнопки
+                btn.innerText = originalText;
+            }).catch(err => {
+                console.error(err);
+                alert('Ошибка создания изображения');
+                btn.innerText = originalText;
+            });
         }
 
         loadData();
