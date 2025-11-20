@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Old Pawnbroker | Долговая книга</title>
+    <style>
+        :root {
+            --bg-color: #1a1818;
+            --paper-color: #fdfbf7;
+            --text-color: #2c2a2a;
+            --accent-color: #8b0000;
+            --green-color: #2e7d32;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            font-family: 'Georgia', serif;
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background-color: var(--paper-color);
+            margin: 20px;
+            padding: 40px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.7);
+            border-radius: 2px;
+            position: relative;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d6d3cd' fill-opacity='0.1'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7z' /%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        /* Эффект старой бумаги */
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            box-shadow: inset 0 0 60px rgba(0,0,0,0.15);
+            pointer-events: none;
+        }
+
+        h1 {
+            text-align: center;
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            border-bottom: 2px solid var(--text-color);
+            padding-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-style: italic;
+            color: #555;
+            margin-bottom: 30px;
+        }
+
+        .stats-box {
+            background: rgba(0,0,0,0.05);
+            padding: 15px;
+            border: 1px solid #ccc;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .money-display {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent-color);
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #ddd;
+            height: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: var(--accent-color);
+            width: 0%;
+            transition: width 0.5s ease-in-out;
+        }
+
+        .list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 10px;
+            border-bottom: 1px dashed #ccc;
+        }
+
+        .list-item:nth-child(even) {
+            background-color: rgba(0,0,0,0.02);
+        }
+
+        .name { font-size: 1.1rem; }
+
+        .status {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+        .status.paid { color: var(--green-color); }
+        .status.pending { color: var(--accent-color); }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #777;
+        }
+
+        .refresh-btn {
+            display: block;
+            margin: 20px auto 0;
+            background: none;
+            border: 1px solid #555;
+            padding: 5px 15px;
+            cursor: pointer;
+            font-family: 'Georgia', serif;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            opacity: 0.6;
+        }
+        .refresh-btn:hover { opacity: 1; background: rgba(0,0,0,0.05); }
+
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #666;
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="container">
+        <h1>The Old Pawnbroker</h1>
+        <div class="subtitle">«Арифметика» сбора</div>
+
+        <div class="stats-box">
+            <h2>Казна:</h2>
+            <div class="money-display" id="total-sum">0 ₽</div>
+            <div style="font-size: 0.9rem">из <span id="goal-sum">0</span> ₽</div>
+            <div class="progress-container">
+                <div class="progress-bar" id="progress"></div>
+            </div>
+            <div style="margin-top: 5px; font-size: 0.8rem;">Сдали: <span id="count-paid">0</span>/25</div>
+        </div>
+
+        <div id="loader" class="loading">Открываю долговую книгу...</div>
+        <ul class="list" id="debt-list"></ul>
+
+        <button onclick="loadData()" class="refresh-btn">Обновить данные</button>
+
+        <footer>
+            © Ф.М. Достоевский <br>
+            Учет и контроль
+        </footer>
+    </div>
+
+    <script>
+        // ==========================================
+        // ВСТАВЬ СЮДА СВОЮ ССЫЛКУ ИЗ GOOGLE SHEETS
+        // Она должна заканчиваться на ...output=csv
+        // ==========================================
+        const SHEET_URL = 'СЮДА_ВСТАВЬ_ССЫЛКУ_НА_CSV'; 
+        
+        const PRICE_PER_PERSON = 5000;
+
+        async function loadData() {
+            const listElement = document.getElementById('debt-list');
+            const loader = document.getElementById('loader');
+            
+            listElement.innerHTML = '';
+            loader.style.display = 'block';
+
+            try {
+                const response = await fetch(SHEET_URL);
+                const data = await response.text();
+                
+                // Парсим CSV (простой метод)
+                const rows = data.split('\n').map(row => row.trim()).filter(row => row.length > 0);
+                // Убираем заголовок (первую строку)
+                const people = rows.slice(1).map(row => {
+                    // Разделяем по запятой. Учитываем, что в именах запятых быть не должно!
+                    const cols = row.split(',');
+                    // Берем имя и статус (0 или 1)
+                    return {
+                        name: cols[0],
+                        paid: cols[1] && (cols[1].trim() === '1' || cols[1].toLowerCase().trim() === 'true')
+                    };
+                });
+
+                renderList(people);
+                loader.style.display = 'none';
+
+            } catch (error) {
+                loader.innerText = 'Ошибка загрузки реестра. Проверь ссылку.';
+                console.error(error);
+            }
+        }
+
+        function renderList(participants) {
+            const listElement = document.getElementById('debt-list');
+            let paidCount = 0;
+            let totalPeople = participants.length;
+
+            participants.forEach((person, index) => {
+                const li = document.createElement('li');
+                li.className = 'list-item';
+                
+                if(person.paid) paidCount++;
+
+                const statusText = person.paid ? 'ВНЕСЕНО' : 'ДОЛГ';
+                const statusClass = person.paid ? 'paid' : 'pending';
+
+                li.innerHTML = `
+                    <div class="name">${index + 1}. ${person.name}</div>
+                    <div class="status ${statusClass}">${statusText}</div>
+                `;
+                listElement.appendChild(li);
+            });
+
+            updateStats(paidCount, totalPeople);
+        }
+
+        function updateStats(paidCount, totalPeople) {
+            const totalGoal = totalPeople * PRICE_PER_PERSON;
+            const currentSum = paidCount * PRICE_PER_PERSON;
+            const percentage = totalGoal > 0 ? (currentSum / totalGoal) * 100 : 0;
+
+            document.getElementById('total-sum').innerText = currentSum.toLocaleString('ru-RU') + ' ₽';
+            document.getElementById('goal-sum').innerText = totalGoal.toLocaleString('ru-RU');
+            document.getElementById('count-paid').innerText = paidCount;
+            document.getElementById('progress').style.width = percentage + '%';
+            
+            if (percentage === 100) {
+                document.getElementById('progress').style.backgroundColor = '#2e7d32';
+            }
+        }
+
+        // Загрузка при старте
+        if (SHEET_URL.includes('google')) {
+            loadData();
+        } else {
+            document.getElementById('loader').innerText = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-QQYIFvB07tM3x00tpl-i55EiO18YVzGXgXuPIsHVvxQ3aidogQ7xX_9PVm7K3-UQz-ZeXqCo90B_/pub?output=csv!';
+        }
+    </script>
+</body>
+</html>
