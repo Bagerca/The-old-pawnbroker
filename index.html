@@ -9,8 +9,9 @@
             --bg-color: #1a1818;
             --paper-color: #fdfbf7;
             --text-color: #2c2a2a;
-            --accent-color: #8b0000;
-            --green-color: #2e7d32;
+            --accent-color: #8b0000; /* Кровь (Долг) */
+            --gold-color: #b8860b;   /* Золото (Частично) */
+            --green-color: #2e7d32;  /* Зеленый (Сдано) */
         }
 
         body {
@@ -36,7 +37,6 @@
             background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d6d3cd' fill-opacity='0.1'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7z' /%3E%3C/g%3E%3C/svg%3E");
         }
 
-        /* Эффект старой бумаги */
         .container::before {
             content: '';
             position: absolute;
@@ -119,7 +119,10 @@
             font-family: 'Courier New', monospace;
             font-weight: bold;
         }
+        
+        /* Статусы */
         .status.paid { color: var(--green-color); }
+        .status.partial { color: var(--gold-color); }
         .status.pending { color: var(--accent-color); }
 
         .loading {
@@ -167,15 +170,15 @@
 
         <div class="stats-box">
             <h2>Казна:</h2>
-            <div class="money-display" id="total-sum">0 ₽</div>
-            <div style="font-size: 0.9rem">из <span id="goal-sum">0</span> ₽</div>
+            <div class="money-display" id="total-collected">0 ₽</div>
+            <div style="font-size: 0.9rem">Цель: <span id="goal-sum">0</span> ₽</div>
             <div class="progress-container">
                 <div class="progress-bar" id="progress"></div>
             </div>
-            <div style="margin-top: 5px; font-size: 0.8rem;">Сдали: <span id="count-paid">0</span>/25</div>
+            <div style="margin-top: 5px; font-size: 0.8rem;">Закрыли долг: <span id="count-paid">0</span>/<span id="total-people-count">24</span></div>
         </div>
 
-        <div id="loader" class="loading">Открываю долговую книгу...</div>
+        <div id="loader" class="loading">Подсчитываю выручку...</div>
         <ul class="list" id="debt-list"></ul>
 
         <button onclick="loadData()" class="refresh-btn">Обновить реестр</button>
@@ -187,7 +190,7 @@
     </div>
 
     <script>
-        // Твоя ссылка уже вставлена сюда:
+        // Твоя ссылка
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-QQYIFvB07tM3x00tpl-i55EiO18YVzGXgXuPIsHVvxQ3aidogQ7xX_9PVm7K3-UQz-ZeXqCo90B_/pub?output=csv'; 
         
         const PRICE_PER_PERSON = 5000;
@@ -200,43 +203,44 @@
             loader.style.display = 'block';
 
             try {
-                // Добавляем случайное число в конец ссылки, чтобы браузер не кэшировал старые данные
                 const response = await fetch(SHEET_URL + '&cache_buster=' + Math.random());
                 const data = await response.text();
                 
-                // Разбиваем CSV на строки
                 const rows = data.split(/\r?\n/).map(row => row.trim()).filter(row => row.length > 0);
                 
-                // Пропускаем первую строку (заголовок) и обрабатываем остальные
+                // Пропускаем заголовок
                 const people = rows.slice(1).map(row => {
                     const cols = row.split(',');
-                    // Берем Имя (колонку 0) и Статус (колонку 1)
-                    // Удаляем лишние кавычки, если они вдруг появятся
                     let name = cols[0] ? cols[0].replace(/^"|"$/g, '') : "Без имени";
-                    let statusRaw = cols[1] ? cols[1].trim() : "0";
                     
-                    return {
-                        name: name,
-                        paid: (statusRaw === '1' || statusRaw.toLowerCase() === 'true')
-                    };
+                    // Очищаем сумму от пробелов и кавычек, превращаем в число
+                    let amountRaw = cols[1] ? cols[1].replace(/[^0-9]/g, '') : "0";
+                    let amount = parseInt(amountRaw);
+                    if (isNaN(amount)) amount = 0;
+                    
+                    return { name, amount };
                 });
 
                 renderList(people);
                 loader.style.display = 'none';
 
             } catch (error) {
-                loader.innerHTML = 'Ошибка: Не удалось прочитать долговую книгу.<br>Проверьте Google Таблицу.';
+                loader.innerHTML = 'Ошибка: Не удалось прочитать долговую книгу.<br>Проверьте таблицу.';
                 console.error(error);
             }
         }
 
         function renderList(participants) {
             const listElement = document.getElementById('debt-list');
-            let paidCount = 0;
-            let totalPeople = participants.length;
+            
+            let totalCollected = 0;
+            let fullPaidCount = 0;
+            // Если в таблице меньше 24 человек, считаем по факту, или фиксируем 24? 
+            // Сейчас код адаптируется под количество строк в таблице.
+            let totalPeople = participants.length; 
 
             if (totalPeople === 0) {
-                 listElement.innerHTML = '<div style="text-align:center; padding:20px;">Список пуст или ошибка чтения таблицы</div>';
+                 listElement.innerHTML = '<div style="text-align:center; padding:20px;">Список пуст</div>';
                  return;
             }
 
@@ -244,10 +248,22 @@
                 const li = document.createElement('li');
                 li.className = 'list-item';
                 
-                if(person.paid) paidCount++;
+                totalCollected += person.amount;
+                if (person.amount >= PRICE_PER_PERSON) fullPaidCount++;
 
-                const statusText = person.paid ? 'ВНЕСЕНО' : 'ДОЛГ';
-                const statusClass = person.paid ? 'paid' : 'pending';
+                let statusText = '';
+                let statusClass = '';
+
+                if (person.amount >= PRICE_PER_PERSON) {
+                    statusText = 'ВНЕСЕНО';
+                    statusClass = 'paid';
+                } else if (person.amount > 0) {
+                    statusText = person.amount.toLocaleString('ru-RU') + ' ₽';
+                    statusClass = 'partial';
+                } else {
+                    statusText = 'ДОЛГ';
+                    statusClass = 'pending';
+                }
 
                 li.innerHTML = `
                     <div class="name">${index + 1}. ${person.name}</div>
@@ -256,27 +272,31 @@
                 listElement.appendChild(li);
             });
 
-            updateStats(paidCount, totalPeople);
+            updateStats(totalCollected, fullPaidCount, totalPeople);
         }
 
-        function updateStats(paidCount, totalPeople) {
+        function updateStats(currentSum, paidCount, totalPeople) {
+            // Если хочешь жестко закрепить цель на 24 человека, 
+            // даже если в таблице их пока меньше, раскомментируй строку ниже:
+            // totalPeople = 24; 
+
             const totalGoal = totalPeople * PRICE_PER_PERSON;
-            const currentSum = paidCount * PRICE_PER_PERSON;
             const percentage = totalGoal > 0 ? (currentSum / totalGoal) * 100 : 0;
 
-            document.getElementById('total-sum').innerText = currentSum.toLocaleString('ru-RU') + ' ₽';
+            document.getElementById('total-collected').innerText = currentSum.toLocaleString('ru-RU') + ' ₽';
             document.getElementById('goal-sum').innerText = totalGoal.toLocaleString('ru-RU');
             document.getElementById('count-paid').innerText = paidCount;
+            document.getElementById('total-people-count').innerText = totalPeople;
+            
             document.getElementById('progress').style.width = percentage + '%';
             
-            if (percentage === 100) {
-                document.getElementById('progress').style.backgroundColor = '#2e7d32';
+            if (percentage >= 100) {
+                document.getElementById('progress').style.backgroundColor = '#2e7d32'; // Зеленый
             } else {
-                document.getElementById('progress').style.backgroundColor = '#8b0000';
+                document.getElementById('progress').style.backgroundColor = '#8b0000'; // Красный
             }
         }
 
-        // Загружаем данные сразу при открытии страницы
         loadData();
     </script>
 </body>
